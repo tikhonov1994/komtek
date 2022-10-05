@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% load bootstrap3 %}
+{% block content %}
+{% if filter %}
+    <form action="" method="get" class="form form-inline">
+        {% bootstrap_form filter.form layout='inline' %}
+        {% bootstrap_button 'Фильтровать' %}
+    </form>
+{% endif %}
+
+
+        <table class="table table-bordered" role="grid">
+            <tr class="header">
+            <th style="width:35%;">Код элемента</th>
+            <th style="width:65%;">Значение</th>
+            </tr>
+            {% for position in page %}
+            <tr>
+            <td>{{ position.element_code }}</td>
+            <td>{{ position.value }}</td>
+            {% endfor %}
+        </table>
+        <div class="text-center">
+          <a class="btn btn-primary btn-lg" href="{% url 'guide:enter_guide_element' guide_pk %}">Добавить элемент справочника</a>
+      </div>
+{% if page.has_other_pages %}
+{% include 'paginator.html' with items=page paginator=paginator%}
+{% endif %}
+
+
+
+
+{% endblock %}

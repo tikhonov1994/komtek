@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% load bootstrap3 %}
+{% block content %}
+{% if filter %}
+    <form action="" method="get" class="form form-inline">
+        {% bootstrap_form filter.form layout='inline' %}
+        {% bootstrap_button 'Фильтровать' %}
+    </form>
+{% endif %}
+
+
+        <table class="table table-bordered" role="grid">
+            <tr class="header">
+            <th style="width:30%;">Наименование</th>
+            <th style="width:15%;">Короткое наименование</th>
+            <th style="width:15%;">Описание</th>
+            <th style="width:15%;">Версия</th>
+            <th style="width:15%;">Дата начала действия</th>
+            <th style="width:10%;"></th>
+            </tr>
+            {% for position in page %}
+            <tr>
+            <td>{{ position.name }}</td>
+            <td>{{ position.short_name }}</td>
+            <td>{{ position.description }}</td>
+            <td>{{ position.version }}</td>
+            <td>{{ position.start_date }}</td>
+              <td>
+                <div class="input-group mb-3">
+                  <a class="btn btn-primary" href="{% url 'guide:guide_elements_table' position.id %}">Просмотреть справочник</a>
+              </div>
+              </td>
+            </tr>
+            {% endfor %}
+        </table>
+        <div class="text-center">
+          <a class="btn btn-primary btn-lg" href="{% url 'guide:enter_guide' %}">Добавить справочник</a>
+      </div>
+{% if page.has_other_pages %}
+{% include 'paginator.html' with items=page paginator=paginator%}
+{% endif %}
+
+
+
+
+{% endblock %}
