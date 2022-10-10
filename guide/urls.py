@@ -1,8 +1,8 @@
 from django.urls import path
 
 from guide.views import (EnterGuideElementView, EnterGuideView,
-                         GuideElementsList, GuideElementsListView,
-                         GuideList, GuideListView)
+                         GuideElementsList, GuideElementsListView, GuideList,
+                         GuideListView)
 
 app_name = 'guide'
 

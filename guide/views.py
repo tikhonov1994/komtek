@@ -1,12 +1,13 @@
 import datetime as dt
 
-from django.core.exceptions import ObjectDoesNotExist
+from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.core.paginator import Paginator
 from django.shortcuts import redirect
 from django.views.generic import FormView, ListView
 from rest_framework import generics, status
 from rest_framework.response import Response
 
+from guide.exceptions import UrlParamMissing
 from guide.filters import GuideElementFilter, GuideFilter
 from guide.forms import GuideElementEnterForm, GuideEnterForm
 from guide.models import Guide, GuideElement
@@ -24,34 +25,42 @@ class GuideList(generics.GenericAPIView):
 
     def get(self, request):
         """
-        На GET запрос присылает список всех справочников.
+        На GET запрос без параметров присылает список всех справочников.
+        На GET запрос с url-параметром ?date=actual присылает все
+        актуальные на сегодня справочники
+        На GET запрос с url-параметром ?date=YYYY-MM-DD присылает
+        список всех справочников, актуальных на дату "YYYY-MM-DD"
         """
-        queryset = self.filter_queryset(self.get_queryset())
-        page = self.paginate_queryset(queryset)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
-
-        serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data)
-
-    def post(self, request):
-        """
-        На POST запрос присылает список всех справочников, актуальных на дату
-        в параметре "date":"YYYY-MM-DD"
-        При POST запросе с пустым параметром "date" вернет все актуальные
-        на сегодня справочники
-        """
-        date = request.data.get('date', None)
+        date = self.request.query_params.get('date', None)
         if date is None:
-            date = dt.date.today()
-        queryset = self.get_queryset(start_date__lte=date)
+            queryset = self.get_queryset()
+        else:
+            if date == 'actual':
+                date = dt.date.today()
+            try:
+                elems_pk = []
+                # Получаем список уникальных наименований справочников
+                names_unique = Guide.objects.values_list('name').distinct()
+                for name in names_unique:
+                    # Получаем по одному актуальные справочники по
+                    # наименованию и дате начала действия
+                    elem = Guide.objects.filter(
+                        name=name[0], start_date__lte=date
+                    ).latest('start_date')
+                    # Записываем ID полученных справочников
+                    elems_pk.append(elem.pk)
+                queryset = self.get_queryset(pk__in=elems_pk)
+            except ValidationError as e:
+                return Response({"error": e},
+                                status=status.HTTP_400_BAD_REQUEST)
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
+            serializer.is_valid(raise_exception=True)
             return self.get_paginated_response(serializer.data)
 
         serializer = self.get_serializer(queryset, many=True)
+        serializer.is_valid(raise_exception=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
@@ -62,36 +71,45 @@ class GuideElementsList(generics.GenericAPIView):
     serializer_class = GuideElementSerializer
 
     def get_queryset(self):
+        guide_name = self.request.query_params.get('name', None)
+        if guide_name is None:
+            raise UrlParamMissing
         version = self.request.query_params.get('version', None)
         if version is not None:
-            queryset = GuideElement.objects.filter(guide__version=version)
+            queryset = GuideElement.objects.filter(
+                guide__version=version, guide__name=guide_name)
         else:
             actual_guide = Guide.objects.filter(
-                start_date__lte=dt.date.today()
-            ).order_by('start_date').last()
+                start_date__lte=dt.date.today(),
+                name=guide_name
+            ).latest('start_date')
             queryset = GuideElement.objects.filter(guide=actual_guide)
         return queryset.order_by('id')
 
     def get(self, request):
         """
-        На GET запрос без параметров присылает все элементы справочника
-        актуальной версии
-        На GET запрос с url-параметром ?version=<version> присылает все
-        элементы справочника указанной версии
+        На GET запрос с url-параметром ?name=<Имя справочника> присылает все
+        элементы справочника "Имя справочника" актуальной версии
+        На GET запрос с параметрами ?name=<Имя справочника>&version=<version>
+        присылает все элементы справочника указанной версии
         """
-        queryset = self.get_queryset()
-        page = self.paginate_queryset(queryset)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
+        try:
+            queryset = self.get_queryset()
+            page = self.paginate_queryset(queryset)
+            if page is not None:
+                serializer = self.get_serializer(page, many=True)
+                return self.get_paginated_response(serializer.data)
 
-        serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data)
+            serializer = self.get_serializer(queryset, many=True)
+            return Response(serializer.data)
+        except UrlParamMissing:
+            return Response({"error": "Не указан url-параметр name"},
+                            status=status.HTTP_400_BAD_REQUEST)
 
     def post(self, request):
         """
-        На POST запрос проверяет валидность элементов справочника
-        актуальной версии или версии из url-параметра version
+        На POST запрос проверяет валидность элементов справочника из
+        url-параметра name актуальной версии или версии из параметра version
         Элементы можно отправить в виде списка:
         [{"element_code":"Код элемента",
           "value":"Значение элемента"},...]

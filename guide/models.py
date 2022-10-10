@@ -18,6 +18,7 @@ class Guide(models.Model):
         indexes = [
             models.Index(fields=['version', 'start_date'])
         ]
+        unique_together = ('name', 'version')
 
     def __str__(self) -> str:
         return f'{self.short_name} version-{self.version}'
@@ -37,6 +38,7 @@ class GuideElement(models.Model):
         indexes = [
             models.Index(fields=['element_code', ])
         ]
+        unique_together = ('guide', 'element_code')
 
     def __str__(self) -> str:
         return self.element_code
