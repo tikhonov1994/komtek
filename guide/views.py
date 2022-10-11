@@ -178,8 +178,8 @@ class EnterGuideView(FormView):
     def form_valid(self, form):
         guide, _ = Guide.objects.update_or_create(
             version=form.cleaned_data.get('version'),
+            name=form.cleaned_data.get('name'),
             defaults={
-                'name': form.cleaned_data.get('name'),
                 'short_name': form.cleaned_data.get('short_name'),
                 'description': form.cleaned_data.get('description'),
                 'start_date': form.cleaned_data.get('start_date'),
